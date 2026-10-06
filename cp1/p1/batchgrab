@@ -1,0 +1,19 @@
+#!/usr/bin/sh
+
+# (1) Opens a file (input argument) that contains
+#  the results of a CLRTOSCAN response,
+# one file per line;
+
+# (2) Iterate through each item and fetch each file.
+
+# There are multiple example files for the shell script
+# that are present in the class repository.
+# You will likely need to modify them to use an
+# appropriate port number for your group (see later)
+# as well as potentially modify the IP addresses
+# depending on where you are testing your client.
+# The examples can be found in cp1/part1/dispatch/clrtoscan.
+# Note that set4.txt adds in comments and one
+# bad authorization into the mix.
+
+
