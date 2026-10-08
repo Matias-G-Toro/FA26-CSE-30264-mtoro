@@ -1,25 +1,32 @@
+#include <fcntl.h>
+#include <assert.h>
+
 #include <stdio.h>
-#include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
 #include <netdb.h>
 #include <sys/types.h>
-#include <netinet/in.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 
+#include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define PORT "54105" // the port client will be connecting to 
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+
 
 #define MAXDATASIZE 100 // max number of bytes we can get at once 
 
 
 void usage(int status);
-void argparse(char * command, int argc, char * argv);
 void *get_in_addr(struct sockaddr *sa);
 size_t get_size(char * filename, int ipaddr, int port, char * token);
+bool sha1sum_file(const char* path, char* cksum);
+
 
 // takes in four parameters:
 //  the name of the file
@@ -30,36 +37,27 @@ size_t get_size(char * filename, int ipaddr, int port, char * token);
 int main(int argc, char *argv[])
 {
 
-	/* PARSE ARGUMENTS (with error checking)*/
+	/* Check arg count */
 	if (argc != 5) usage(1);
 
-
-	char * command;
-	arg
-	char * name = argv[1];
-	char * hostname = argv[2]; // TODO: DNS resolution, atoi/to ip adrees convesion
-	char * port = argv[3]; // TODO: atoi
-	char * token = argv[4]; // TODO: atoi
-	
+	char * name = argv[1];  // NOTE: Validity handled by the server.
+	char * hostname = argv[2]; // NOTE: DNS handled by Beej template
+	char * port = argv[3]; // NOTE: DNS handled by Beej template
+	char * token = argv[4]; // NOTE: Validity handled by the server
 
 	/* Beej Template Start */
 	
     int sockfd, numbytes;  
-    char buf[MAXDATASIZE];
     struct addrinfo hints, *servinfo, *p;
     int rv;
     char s[INET6_ADDRSTRLEN];
 
-    if (argc != 2) {
-        fprintf(stderr,"usage: client hostname\n");
-        exit(1);
-    }
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    if ((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0) {
+    if ((rv = getaddrinfo(hostname, port, &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
     }
@@ -75,7 +73,6 @@ int main(int argc, char *argv[])
         inet_ntop(p->ai_family,
             get_in_addr((struct sockaddr *)p->ai_addr),
             s, sizeof s);
-        printf("client: attempting connection to %s\n", s);
 
         if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
             perror("client: connect");
@@ -94,30 +91,52 @@ int main(int argc, char *argv[])
     inet_ntop(p->ai_family,
             get_in_addr((struct sockaddr *)p->ai_addr),
             s, sizeof s);
-	// NOTE: Client connected here
-
-	// TODO: do all of the "write" system calls here. Logic is hardcoded based on argparse.
 
     freeaddrinfo(servinfo); // all done with this structure
 
-	// TODO : While true loop perhaps everything in a buffer as well.
-    if ((numbytes = recv(sockfd, buf, MAXDATASIZE-1, 0)) == -1) {
-        perror("recv");
-        exit(1);
-    }
 
-    buf[numbytes] = '\0';
+	// NOTE: Client connected here & addrinfo freed
 
-    printf("client: received '%s'\n",buf);
+	// https://cis.temple.edu/~giorgio/old/cis307s96/readings/docs/sockets.html#Connect
+	// int bcount; /* counts bytes read */
+	// int br;     /* bytes read this pass */
 
+
+    /* Open file stream from socket file descriptor */
+
+	// Ask for the info, checksum of everything:
+	char send_buf[MAXDATASIZE];
+	sprintf(send_buf, "INFO %s %s", name, token);
+	printf("%s\n",send_buf);
+	send(sockfd, send_buf, strlen(send_buf), NULL);
+
+	/* Read HTTP Response */
+    char read_buf[BUFSIZ];
+	recv(sockfd, read_buf, BUFSIZ, NULL);
+	printf("%s\n", read_buf);
+
+	// close(socketfd); // first, perhaps?
     close(sockfd);
 
     return 0;
 
 
+	/*
+	int fail_count = EXIT_SUCCESS; // idk, i say EXIT_SUCCESS Being used before.
+	char cksum[BUFSIZ];
+	for (int i = 1; i < argc; i++) { 
+		if (!sha1sum_file(argv[i], cksum)) {
+			fail_count += 1;
+		} else {
+			printf("%s %s\n", cksum, argv[i]);
+		}
+	}
+	*/
+
 	/* TESTS
 	FB001.dat 127.0.0.1 54000 BinaryFilePNG
-	F001.dat 127.0.0.1 54000 AuthSimpleF001.dat 127.0.0.1 54000 AuthSimple
+	F001.dat 127.0.0.1 54000 AuthSimple
+	F001.dat 127.0.0.1 54000 AuthSimple
 	F002.dat 127.0.0.1 54000 AFE4c3982a
 	FB001.dat 127.0.0.1 54000 BinaryFilePNG
 	F001.dat 127.0.0.1 54000 AuthSimple
@@ -151,10 +170,6 @@ void usage(int status) {
 }
 
 
-void argparse(char * command, int argc, char * argv) {
-	if (argc != 5) usage(1);
-}
-
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
@@ -164,4 +179,55 @@ void *get_in_addr(struct sockaddr *sa)
     }
 
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
+// NOTE: Bui reading 1 code
+bool sha1sum_file(const char* path, char* cksum) {
+	bool success_flag = false;
+	EVP_MD_CTX *mdctx = NULL;
+
+	int fd = open(path, O_RDONLY); // Open file for reading
+	if (fd < 0) {
+		goto failure;
+	}
+
+	mdctx = EVP_MD_CTX_new(); // Create & initialize context	
+
+	if (!mdctx || !EVP_DigestInit_ex(mdctx, EVP_sha1(), NULL)) {
+		goto failure;
+	}
+
+	char buffer[BUFSIZ];
+	ssize_t nread = 0;
+
+	while ((nread = read(fd, buffer, BUFSIZ)) > 0) {
+		// read file chunk by chunk and do a little math on each chunk to update and digest
+		if (!EVP_DigestUpdate(mdctx, buffer, nread)) {
+			goto failure;
+		}
+	}
+
+	if (nread < 0) {
+		goto failure;
+	}
+
+	/* Computer SHA1 */	
+	uint8_t digest[SHA_DIGEST_LENGTH];
+	if (!EVP_DigestFinal_ex(mdctx, digest, NULL)) {
+		goto failure;
+	}
+
+
+	/* Convert digest to hexadecimal digest */
+	for (int b = 0; b < SHA_DIGEST_LENGTH; b++) {
+		snprintf(cksum + 2*b, 3, "%02x", digest[b]);
+	}
+
+	success_flag = true;
+
+	failure:
+		/* Clean up */
+		if (fd >= 0) close (fd); // Every time I fall down to this label, I close down the file.
+		if (mdctx) EVP_MD_CTX_free(mdctx);
+		return success_flag;
 }
