@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 
 	/* Beej Template Start */
 	
-    int sockfd, numbytes;  
+    int sockfd;  
     struct addrinfo hints, *servinfo, *p;
     int rv;
     char s[INET6_ADDRSTRLEN];
@@ -104,16 +104,51 @@ int main(int argc, char *argv[])
 
     /* Open file stream from socket file descriptor */
 
-	// Ask for the info, checksum of everything:
-	char send_buf[MAXDATASIZE];
-	sprintf(send_buf, "INFO %s %s", name, token);
-	printf("%s\n",send_buf);
-	send(sockfd, send_buf, strlen(send_buf), NULL);
+	/* Send INFO to get file bytes & checksum */
+	char info_buf[MAXDATASIZE];
+	sprintf(info_buf, "INFO %s %s", name, token);
+	printf("%s\n",info_buf);
+	send(sockfd, info_buf, strlen(info_buf), 0);
 
-	/* Read HTTP Response */
+	/* Get file bytes & checksum from info */
     char read_buf[BUFSIZ];
-	recv(sockfd, read_buf, BUFSIZ, NULL);
+	recv(sockfd, read_buf, BUFSIZ, 0);
+
+	/* check if incomplete message */
+	if (strlen(read_buf) < 3) return 1; 
+
+	char info_resp[1<<5];
+	char status[1<<5];
+	char file[1<<6];
+	int server_bytes = 0;
+	char server_cksum[1<<6];
+	sscanf(read_buf, "%s %s %s %d %s", info_resp, status, file, &server_bytes, server_cksum);
+
+	// Check if we got an info response
 	printf("%s\n", read_buf);
+	if (strcmp(info_resp, "INFO-RESP") != 0) { 
+		fprintf(stderr, "irregular response\n");
+		return 1;
+	}
+	if (strcmp(status, "WRONGAUTH") == 0) {
+		fprintf(stderr, "wrongauth server response\n");
+		return 1;
+	}
+	if (strcmp(name,file) != 0) {
+		fprintf(stderr, "got wrong filename\n");
+	}
+
+	char read_window[MAXDATASIZE];
+	recv(sockfd, buf, size, flags);
+	
+	int nread = 0;
+	while (nread <= server_bytes) {
+		nread += recv(sockfd, read_window, MAXDATASIZE, 0);
+		read_window += nread;
+	}
+	printf("server_bytes: %d\n", server_bytes);
+	printf("server_cksum: %s\n", server_cksum); 
+	printf("file: %s\n", file);
 
 	// close(socketfd); // first, perhaps?
     close(sockfd);
