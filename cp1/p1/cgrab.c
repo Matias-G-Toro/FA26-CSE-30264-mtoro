@@ -9,6 +9,7 @@
 #include <string.h>
 #include <netdb.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
 
@@ -105,10 +106,10 @@ int main(int argc, char *argv[])
     /* Open file stream from socket file descriptor */
 
 	/* Send INFO to get file bytes & checksum */
-	char info_buf[MAXDATASIZE];
-	sprintf(info_buf, "INFO %s %s", name, token);
-	printf("%s\n",info_buf);
-	send(sockfd, info_buf, strlen(info_buf), 0);
+	char request_buf[MAXDATASIZE];
+	sprintf(request_buf, "INFO %s %s", name, token);
+	printf("%s\n",request_buf);
+	send(sockfd, request_buf, strlen(request_buf), 0);
 
 	/* Get file bytes & checksum from info */
     char read_buf[BUFSIZ];
@@ -117,16 +118,16 @@ int main(int argc, char *argv[])
 	/* check if incomplete message */
 	if (strlen(read_buf) < 3) return 1; 
 
-	char info_resp[1<<5];
+	char resp_word[1<<5];
 	char status[1<<5];
 	char file[1<<6];
 	int server_bytes = 0;
 	char server_cksum[1<<6];
-	sscanf(read_buf, "%s %s %s %d %s", info_resp, status, file, &server_bytes, server_cksum);
+	sscanf(read_buf, "%s %s %s %d %s", resp_word, status, file, &server_bytes, server_cksum);
 
 	// Check if we got an info response
 	printf("%s\n", read_buf);
-	if (strcmp(info_resp, "INFO-RESP") != 0) { 
+	if (strcmp(resp_word, "INFO-RESP") != 0) { 
 		fprintf(stderr, "irregular response\n");
 		return 1;
 	}
@@ -138,17 +139,34 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "got wrong filename\n");
 	}
 
+	// ask for the file
+	char new_buf[BUFSIZ];
+	sprintf(request_buf, "GRAB %s %s", name, token);
+	printf("%s\n",request_buf);
+	send(sockfd, request_buf, strlen(request_buf), 0);
+	recv(sockfd, new_buf, BUFSIZ, 0);
+	printf("%s\n", new_buf);
+	recv(sockfd, new_buf, BUFSIZ, 0);
+	new_buf[server_bytes] = '\0';
+	printf("%s\n", new_buf);
+
+
+	/*
 	char read_window[MAXDATASIZE];
 	recv(sockfd, buf, size, flags);
 	
 	int nread = 0;
+	// don't even check for the scans directory, just open it
+	mkdir("scans", -1);
+	chdir("scans");
+	int fd
 	while (nread <= server_bytes) {
 		nread += recv(sockfd, read_window, MAXDATASIZE, 0);
-		read_window += nread;
 	}
 	printf("server_bytes: %d\n", server_bytes);
 	printf("server_cksum: %s\n", server_cksum); 
 	printf("file: %s\n", file);
+	*/
 
 	// close(socketfd); // first, perhaps?
     close(sockfd);
