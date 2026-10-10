@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <string.h>
 #include <netdb.h>
+#include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -93,17 +94,8 @@ int main(int argc, char *argv[])
             get_in_addr((struct sockaddr *)p->ai_addr),
             s, sizeof s);
 
-    freeaddrinfo(servinfo); // all done with this structure
-
-
-	// NOTE: Client connected here & addrinfo freed
-
-	// https://cis.temple.edu/~giorgio/old/cis307s96/readings/docs/sockets.html#Connect
-	// int bcount; /* counts bytes read */
-	// int br;     /* bytes read this pass */
-
-
-    /* Open file stream from socket file descriptor */
+    freeaddrinfo(servinfo);
+	// NOTE: Client connected & addrinfo freed. Free to start talking
 
 	/* Send INFO to get file bytes & checksum */
 	char request_buf[MAXDATASIZE];
@@ -115,7 +107,7 @@ int main(int argc, char *argv[])
     char read_buf[BUFSIZ];
 	recv(sockfd, read_buf, BUFSIZ, 0);
 
-	/* check if incomplete message */
+	/* Check if we got an proper info response */
 	if (strlen(read_buf) < 3) return 1; 
 
 	char resp_word[1<<5];
@@ -125,7 +117,6 @@ int main(int argc, char *argv[])
 	char server_cksum[1<<6];
 	sscanf(read_buf, "%s %s %s %d %s", resp_word, status, file, &server_bytes, server_cksum);
 
-	// Check if we got an info response
 	printf("%s\n", read_buf);
 	if (strcmp(resp_word, "INFO-RESP") != 0) { 
 		fprintf(stderr, "irregular response\n");
@@ -139,52 +130,62 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "got wrong filename\n");
 	}
 
-	// ask for the file
-	char new_buf[BUFSIZ];
+	/* Grab the actual file */
+	char grab_arr[MAXDATASIZE];
 	sprintf(request_buf, "GRAB %s %s", name, token);
 	printf("%s\n",request_buf);
+
+	/* Verify the grab response for the file is ok */
 	send(sockfd, request_buf, strlen(request_buf), 0);
-	recv(sockfd, new_buf, BUFSIZ, 0);
-	printf("%s\n", new_buf);
-	recv(sockfd, new_buf, BUFSIZ, 0);
-	new_buf[server_bytes] = '\0';
-	printf("%s\n", new_buf);
+	recv(sockfd, grab_arr, MAXDATASIZE, 0);
+	if (strlen(read_buf) < 3) return 1; 
 
-
-	/*
-	char read_window[MAXDATASIZE];
-	recv(sockfd, buf, size, flags);
-	
-	int nread = 0;
-	// don't even check for the scans directory, just open it
-	mkdir("scans", -1);
-	chdir("scans");
-	int fd
-	while (nread <= server_bytes) {
-		nread += recv(sockfd, read_window, MAXDATASIZE, 0);
+	printf("%s\n", grab_arr);
+	sscanf(grab_arr, "%s %s %s", resp_word, status, file);
+	if (strcmp(resp_word, "GRAB-RESP") != 0) { 
+		fprintf(stderr, "irregular response\n");
+		return 1;
 	}
-	printf("server_bytes: %d\n", server_bytes);
-	printf("server_cksum: %s\n", server_cksum); 
-	printf("file: %s\n", file);
-	*/
+	if (strcmp(status, "OK") != 0) {
+		fprintf(stderr, "wrongauth server response\n");
+		return 1;
+	}
+	if (strcmp(name,file) != 0) {
+		fprintf(stderr, "got wrong filename\n");
+	}
+	
+	// FILESYSTEM: every recv will now get a BUFSIZ chunk of the file.
+	mkdir ("scans", 7<<6); //normal group flags
+	chdir("scans");
+	char * stripped_file = strrchr(file, '/') + 1; // strip pathnames
+	printf("opening file: %s\n", stripped_file);
+	int fd = open(stripped_file, O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR); // NOTE: This always handles empty files
+	char file_bucket[MAXDATASIZE];
+	int nread;
 
-	// close(socketfd); // first, perhaps?
-    close(sockfd);
+	while (server_bytes > 0) { 
+		nread = recv(sockfd,file_bucket,MAXDATASIZE,0);
+		write(fd, file_bucket, nread);
+		server_bytes -= nread;
+	}
+	printf("scans/%s file successfully downloaded (unverified)\n", stripped_file);
+	close(fd);
+	close(sockfd);
 
-    return 0;
+	// TODO: md5sum check the file after you are done downloading
+	DIR *vp = opendir("../validation");
+	if (vp == NULL) {closedir(vp); return 0;} // return the file unverified!
 
-
-	/*
-	int fail_count = EXIT_SUCCESS; // idk, i say EXIT_SUCCESS Being used before.
-	char cksum[BUFSIZ];
-	for (int i = 1; i < argc; i++) { 
-		if (!sha1sum_file(argv[i], cksum)) {
-			fail_count += 1;
-		} else {
-			printf("%s %s\n", cksum, argv[i]);
+	struct dirent *d;
+	while ((d = readdir(vp)) != NULL) {
+		if (strcmp(d->d_name, stripped_file) == 0) {
+			printf("found verification target: %lu validation/%s\n", (unsigned long) d->d_ino, d->d_name);
 		}
 	}
-	*/
+
+	// TODO: server_cksum
+
+    return 0;
 
 	/* TESTS
 	FB001.dat 127.0.0.1 54000 BinaryFilePNG
@@ -213,6 +214,7 @@ int main(int argc, char *argv[])
 	FB003.dat 127.0.0.1 54000 BinaryOwls
 
 	*/
+	// https://cis.temple.edu/~giorgio/old/cis307s96/readings/docs/sockets.html#Connect
 
 }
 
@@ -234,7 +236,7 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-// NOTE: Bui reading 1 code
+// NOTE: Bui reading 1 code, modified
 bool sha1sum_file(const char* path, char* cksum) {
 	bool success_flag = false;
 	EVP_MD_CTX *mdctx = NULL;
