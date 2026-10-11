@@ -18,7 +18,7 @@
 #include <arpa/inet.h>
 
 #include <openssl/evp.h>
-#include <openssl/sha.h>
+#include <openssl/md5.h>
 
 
 #define MAXDATASIZE 100 // max number of bytes we can get at once 
@@ -27,7 +27,7 @@
 void usage(int status);
 void *get_in_addr(struct sockaddr *sa);
 size_t get_size(char * filename, int ipaddr, int port, char * token);
-bool sha1sum_file(const char* path, char* cksum);
+bool md5sum_file(const char* path, char* cksum);
 
 
 // takes in four parameters:
@@ -186,15 +186,21 @@ int main(int argc, char *argv[])
 		write(fd, file_bucket, nread);
 		server_bytes -= nread;
 	}
-	printf("scans/%s file successfully downloaded (unverified)\n\n", stripped_file);
+	printf("scans/%s successfully downloaded (unverified)\n", stripped_file);
 	close(fd);
 	close(sockfd);
 
-	// TODO: md5sum check the file after you are done downloading
+	/* md5sum check the file after you are done downloading */
+	
+	
+	if (md5sum_file(stripped_file, server_cksum)) {
+		printf("scans/%s successfully verified!\n\n", stripped_file);
+		return 0;
+	} else{
+		printf("scans/%s does not match checksum!\n\n", stripped_file);
+		return 1;
+	}
 
-	// TODO: server_cksum
-
-    return 0;
 
 }
 
@@ -217,7 +223,7 @@ void *get_in_addr(struct sockaddr *sa)
 }
 
 // NOTE: Bui reading 1 code, modified
-bool sha1sum_file(const char* path, char* cksum) {
+bool md5sum_file(const char* path, char* cksum) {
 	bool success_flag = false;
 	EVP_MD_CTX *mdctx = NULL;
 
@@ -228,7 +234,7 @@ bool sha1sum_file(const char* path, char* cksum) {
 
 	mdctx = EVP_MD_CTX_new(); // Create & initialize context	
 
-	if (!mdctx || !EVP_DigestInit_ex(mdctx, EVP_sha1(), NULL)) { // TODO
+	if (!mdctx || !EVP_DigestInit_ex(mdctx, EVP_md5(), NULL)) { // TODO
 		goto failure;
 	}
 
@@ -247,14 +253,14 @@ bool sha1sum_file(const char* path, char* cksum) {
 	}
 
 	/* Computer SHA1 */	
-	uint8_t digest[SHA_DIGEST_LENGTH]; // TODO
+	uint8_t digest[MD5_DIGEST_LENGTH]; // TODO
 	if (!EVP_DigestFinal_ex(mdctx, digest, NULL)) {
 		goto failure;
 	}
 
 
 	/* Convert digest to hexadecimal digest */
-	for (int b = 0; b < SHA_DIGEST_LENGTH; b++) { // TODO
+	for (int b = 0; b < MD5_DIGEST_LENGTH; b++) { // TODO
 		snprintf(cksum + 2*b, 3, "%02x", digest[b]);
 	}
 
