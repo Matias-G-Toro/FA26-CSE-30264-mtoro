@@ -42,7 +42,8 @@ int main(int argc, char *argv[])
 	/* Check arg count */
 	if (argc != 5) usage(1);
 
-	char * name = argv[1];  // NOTE: Validity handled by the server.
+	char name[MAXDATASIZE>>1]; // name should be half the maxdatasize
+	strcpy(name, argv[1]); // NOTE: Validity handled by the server. Client will retry if the 'data/' prefix isn't there
 	char * hostname = argv[2]; // NOTE: DNS handled by Beej template
 	char * port = argv[3]; // NOTE: DNS handled by Beej template
 	char * token = argv[4]; // NOTE: Validity handled by the server
@@ -100,6 +101,16 @@ int main(int argc, char *argv[])
 	/* Send INFO to get file bytes & checksum */
 	char request_buf[MAXDATASIZE];
 	sprintf(request_buf, "INFO %s %s", name, token);
+	bool wrongauth_seen = false;
+	FILENAME_RETRY: 
+	if (wrongauth_seen) {
+		/* tack on 'data/' prefix to name and resend command*/
+		printf("name before: %s\n", name);
+		char prev_name[MAXDATASIZE];
+		strcpy(prev_name, name);
+		sprintf(name, "data/%s", prev_name);
+		sprintf(request_buf, "INFO %s %s", name, token);
+	}
 	printf("%s\n",request_buf);
 	send(sockfd, request_buf, strlen(request_buf), 0);
 
@@ -119,15 +130,23 @@ int main(int argc, char *argv[])
 
 	printf("%s\n", read_buf);
 	if (strcmp(resp_word, "INFO-RESP") != 0) { 
-		fprintf(stderr, "irregular response\n");
-		return 1;
 	}
+
+	if (strcmp(name,file) != 0) {
+		fprintf(stderr, "got wrong filename OR did not tack 'data/' prefix onto filename prefix \n\n");
+	}
+
+	// TODO: May be the genuine wrong auth, or the filename may need a 'data/' prefix tacked on:
 	if (strcmp(status, "WRONGAUTH") == 0) {
 		fprintf(stderr, "wrongauth server response\n");
-		return 1;
-	}
-	if (strcmp(name,file) != 0) {
-		fprintf(stderr, "got wrong filename\n");
+		printf("seeing if data/ is in \"%s\"\n", name);
+		if (strstr(name, "data/") == NULL) {
+			printf("retrying with data/ prefix on the filename\n");
+			wrongauth_seen = true;
+			goto FILENAME_RETRY;
+		} else {
+			return 1;
+		}
 	}
 
 	/* Grab the actual file */
@@ -143,15 +162,15 @@ int main(int argc, char *argv[])
 	printf("%s\n", grab_arr);
 	sscanf(grab_arr, "%s %s %s", resp_word, status, file);
 	if (strcmp(resp_word, "GRAB-RESP") != 0) { 
-		fprintf(stderr, "irregular response\n");
+		fprintf(stderr, "irregular response\n\n");
 		return 1;
 	}
 	if (strcmp(status, "OK") != 0) {
-		fprintf(stderr, "wrongauth server response\n");
+		fprintf(stderr, "server response not OK\n\n");
 		return 1;
 	}
 	if (strcmp(name,file) != 0) {
-		fprintf(stderr, "got wrong filename\n");
+		fprintf(stderr, "got wrong filename\n\n");
 	}
 	
 	// FILESYSTEM: every recv will now get a BUFSIZ chunk of the file.
@@ -173,15 +192,6 @@ int main(int argc, char *argv[])
 	close(sockfd);
 
 	// TODO: md5sum check the file after you are done downloading
-	DIR *vp = opendir("../validation");
-	if (vp == NULL) {closedir(vp); return 0;} // return the file unverified!
-
-	struct dirent *d;
-	while ((d = readdir(vp)) != NULL) {
-		if (strcmp(d->d_name, stripped_file) == 0) {
-			printf("found verification target: %lu validation/%s\n", (unsigned long) d->d_ino, d->d_name);
-		}
-	}
 
 	// TODO: server_cksum
 
@@ -220,7 +230,7 @@ int main(int argc, char *argv[])
 
 
 void usage(int status) {
-    fprintf(stderr, "Usage: cgrab FILE [HOST|IP] PORT TOKEN\n\n");
+    fprintf(stderr, "Usage: cgrab FILE [HOST|IP] PORT TOKEN\n");
     exit(status);
 }
 
