@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 	/* Check arg count */
 	if (argc != 5) usage(1);
 
-	char name[MAXDATASIZE>>1]; // name should be half the maxdatasize
+	char name[MAXDATASIZE+strlen("data/")]; // NOTE: Accomodate for possible prefix
 	strcpy(name, argv[1]); // NOTE: Validity handled by the server. Client will retry if the 'data/' prefix isn't there
 	char * hostname = argv[2]; // NOTE: DNS handled by Beej template
 	char * port = argv[3]; // NOTE: DNS handled by Beej template
@@ -99,13 +99,12 @@ int main(int argc, char *argv[])
 	// NOTE: Client connected & addrinfo freed. Free to start talking
 
 	/* Send INFO to get file bytes & checksum */
-	char request_buf[MAXDATASIZE];
+	char request_buf[MAXDATASIZE<<1]; // double the size
 	sprintf(request_buf, "INFO %s %s", name, token);
 	bool wrongauth_seen = false;
 	FILENAME_RETRY: 
 	if (wrongauth_seen) {
 		/* tack on 'data/' prefix to name and resend command*/
-		printf("name before: %s\n", name);
 		char prev_name[MAXDATASIZE];
 		strcpy(prev_name, name);
 		sprintf(name, "data/%s", prev_name);
@@ -138,13 +137,13 @@ int main(int argc, char *argv[])
 
 	// TODO: May be the genuine wrong auth, or the filename may need a 'data/' prefix tacked on:
 	if (strcmp(status, "WRONGAUTH") == 0) {
-		fprintf(stderr, "wrongauth server response\n");
-		printf("seeing if data/ is in \"%s\"\n", name);
+		printf("wrongauth server response\n");
 		if (strstr(name, "data/") == NULL) {
 			printf("retrying with data/ prefix on the filename\n");
 			wrongauth_seen = true;
 			goto FILENAME_RETRY;
 		} else {
+			putc('\n', stdout);
 			return 1;
 		}
 	}
@@ -187,7 +186,7 @@ int main(int argc, char *argv[])
 		write(fd, file_bucket, nread);
 		server_bytes -= nread;
 	}
-	printf("scans/%s file successfully downloaded (unverified)\n", stripped_file);
+	printf("scans/%s file successfully downloaded (unverified)\n\n", stripped_file);
 	close(fd);
 	close(sockfd);
 
@@ -196,35 +195,6 @@ int main(int argc, char *argv[])
 	// TODO: server_cksum
 
     return 0;
-
-	/* TESTS
-	FB001.dat 127.0.0.1 54000 BinaryFilePNG
-	F001.dat 127.0.0.1 54000 AuthSimple
-	F001.dat 127.0.0.1 54000 AuthSimple
-	F002.dat 127.0.0.1 54000 AFE4c3982a
-	FB001.dat 127.0.0.1 54000 BinaryFilePNG
-	F001.dat 127.0.0.1 54000 AuthSimple
-	F002.dat 127.0.0.1 54000 AFE4c3982a
-	F001.dat 127.0.0.1 54000 AuthSimple
-	F002.dat 127.0.0.1 54000 AFE4c3982a
-	F003.dat 127.0.0.1 54000 BooBadgers
-	F004.dat 127.0.0.1 54000 BooSparty
-	# Comments in the mix
-	F001.dat 127.0.0.1 54000 AuthSimple
-	F002.dat 127.0.0.1 54000 AFE4c3982a
-	F003.dat 127.0.0.1 54000 BooBadgers
- 	# Bad authorization
-	F004.dat 127.0.0.1 54000 BooSparty!
-	# Unknown file
-	F100.dat 127.0.0.1 54000 BooOwls
-	F001.dat 127.0.0.1 54000 AuthSimple
-	F002.dat 127.0.0.1 54000 AFE4c3982a
-	FB001.dat 127.0.0.1 54000 BinaryFilePNG
-	FB002.dat 127.0.0.1 54000 BinaryFileTwo
-	FB003.dat 127.0.0.1 54000 BinaryOwls
-
-	*/
-	// https://cis.temple.edu/~giorgio/old/cis307s96/readings/docs/sockets.html#Connect
 
 }
 
@@ -258,7 +228,7 @@ bool sha1sum_file(const char* path, char* cksum) {
 
 	mdctx = EVP_MD_CTX_new(); // Create & initialize context	
 
-	if (!mdctx || !EVP_DigestInit_ex(mdctx, EVP_sha1(), NULL)) {
+	if (!mdctx || !EVP_DigestInit_ex(mdctx, EVP_sha1(), NULL)) { // TODO
 		goto failure;
 	}
 
@@ -277,14 +247,14 @@ bool sha1sum_file(const char* path, char* cksum) {
 	}
 
 	/* Computer SHA1 */	
-	uint8_t digest[SHA_DIGEST_LENGTH];
+	uint8_t digest[SHA_DIGEST_LENGTH]; // TODO
 	if (!EVP_DigestFinal_ex(mdctx, digest, NULL)) {
 		goto failure;
 	}
 
 
 	/* Convert digest to hexadecimal digest */
-	for (int b = 0; b < SHA_DIGEST_LENGTH; b++) {
+	for (int b = 0; b < SHA_DIGEST_LENGTH; b++) { // TODO
 		snprintf(cksum + 2*b, 3, "%02x", digest[b]);
 	}
 
