@@ -21,7 +21,7 @@
 #include <openssl/md5.h>
 
 
-#define MAXDATASIZE 100 // max number of bytes we can get at once 
+#define MAXDATASIZE 4096 // max number of bytes we can get at once 
 
 
 void usage(int status);
