@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 import argparse
+import socket
+import sys
+import os
+import csv
+import json
+
+# 1 pt - New tokens are generated for each different client
+# 1 pt - Arguments can change port, auth file, set
 
 
-# TODO: parse arguments
-# https://docs.python.org/3.12/library/argparse.html
-# The server should start up taking in an argument for which port,
-# which set of data to provide (a specific JSON file),
-# and an authorization file.
-# There should be default values for each of those settings elected by you.
-
-
-# TODO: Wait for UDP on the port
+# TODO: Wait for UDP on the port. This must operate over UDP
 # add timeout
 
-# Process the HELLO2 message.
+# Process the HELLO2 (not HELLO) message.
 # Confirm that the ID provided by the client matches up correctly using one of the auth lists.
 # Generate a random string (nonce) of 8-12 characters for the AUTHTOKEN using the same AUTHSIMPLE auth mode.
 
@@ -23,3 +23,84 @@ import argparse
 # The AuthTestOnly39# should not work on RDYTOSCAN, only HELLO.
 
 # Using the information specified when the server started up, provide a properly formatted list.
+
+def init_auth(authlist):
+    with open(autlist, "r") as authlist_file:
+        authlist_reader = reader(authlist_file)
+        for row in authlist_reader
+            # process(row)
+            # TODO: Load this into some dict
+
+def init_scan(scansets):
+    for args in 
+
+def parse_arguments():
+    
+    desc= """dispatch-server [OPTIONS]
+    -p, --port PORT
+        override the default port 54000 (between 54000 and 54150)
+    -a, --auth FILE
+        override the default input csv file for authorization
+    -s, --scansets FILE
+        override the specified JSON file
+    """
+    parser = argparse.ArgumentParser(
+        prog='dispatch-server',
+        description='securely serve a json file up over UDP', 
+        epilog=desc
+    )
+
+    parser.add_argument("-p", "--port",
+        default=54000,
+        type=int,
+        help="override the default port 54000 (between 54000 and 54150)"
+    ) 
+    parser.add_argument("-a", "--auth",
+        default="auth1.csv",
+        type=str,
+        choices=os.listdir("authlists"),
+        help="select input csv file from ./authlists/ (default is 'auth1.csv')"
+    )
+    parser.add_argument("-s", "--scansets",
+        default="scan.json",
+        type=str,
+        choices=os.listdir("scansets"),
+        help="select JSON file from ./scansets/ (default is 'scan.json')"
+    ) 
+
+    args = parser.parse_args()
+    if args.port < 54000 or args.port > 54150:
+        print("port must be between 54000 and 54150!", file=sys.stderr)
+        sys.exit(2)
+
+    return args
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    print(args.port, args.auth, args.scansets)
+    # TODO: Initialize Auths and scansets
+    auths = init_auth(args.auth)
+    scanset = init_scan(args.scan)
+
+    # set address and port
+    server_address_port = ("127.0.0.1", args.port)
+
+    # create a UDP socket at server side
+    server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    client = set() # TODO: give each client unique auth with hash() of unique ip, port pairs
+    # TODO: purely just call hash() function
+        # str(int(hash((1,2)))*-1)[:12]
+    while True:
+        # Receive request from client
+        client_data = server_sock.recvfrom(1024)
+        msg_from_client = client_data[0].decode()
+        client_address, client_port = client_data[1]
+        # TODO: Process data from client (no forking yet)
+        print(msg_from_client)
+
+
+# 1 pt - HELLO2 is parsed properly
+# 1 pt - RHELLO2 is responded properly
+# 1 pt - CLRTOSCAN is parsed properly
+# 1 pt - RDYTOSCAN is responded properly

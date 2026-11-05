@@ -1,0 +1,13 @@
+#!/usr/bin/sh
+SERVER_IP="127.0.0.1"
+SERVER_PORT="54000"
+COMMAND_FILES_DIR="clrtoscan"
+
+# Exclude comments in files
+# Replace spaces with '^' so that the for loop parser doesn't
+# parse out every word
+for file in $(ls $COMMAND_FILES_DIR); do
+	for com in $(cat "$COMMAND_FILES_DIR/$file" | grep -Ev "^#.*" | tr ' ' '^'); do COMMAND=$(echo ./cgrab $com | tr '^' '\t')
+		$COMMAND 
+	done
+done

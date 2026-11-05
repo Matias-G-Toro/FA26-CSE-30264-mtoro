@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+import socket
+import sys
+import signal # handle Ctrl + C
+
+# Take IP and port of dispatch server
+# TODO: error handling
+server_address_port = (sys.argv[1], int(sys.argv[2]))
+
+
+# It should take in the IP and port of the dispatch server.
+# It should also take in an ID and authorization information.
+
+# ./full-client 127.0.0.1 54057 RandomID AuthTestOnly39#
+# ./full-client 127.0.0.1 54102 GoIrishBeatStanford AuthTest
+# On startup, it should connect to the server using that information.
+
+# If successfully authenticated, it should send a RDYTOSCAN request to the server.
+
+# If a CLRTOSCAN message is successfully received, it should use your code from Part 1 to fetch all of the files.
+
+# It should pause for somewhere between ten to thirty seconds and then repeat the process. We will swap this out in Part 3.
+
+# You may wish to add a --nosleep flag that disables this option.
+# You should gracefully catch and handle Control-C.
+
+# It is up to you if this is a change to your C client or a new piece of wrapper code (Python, shell scripting, etc.).
+
+
+# 1 pt - Properly runs on the CSE student machine
+# 1 pt - Properly catches Control-C and exits gracefully
+# 1 pt - Properly sleeps as part of the loop
+# 4 pt - Properly loops and underlying client fetches all relevant files (set1, set3, set5)
+# Ideally sets via change-set but also OK if selected on server launch
+

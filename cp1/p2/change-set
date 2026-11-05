@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# 2 pts - Proper authentication, properly switches a set of files (set1 to set3)
+# 1 pt - Denies if the password is incorrect
+# 1 pt - The client is helpful on errors (ex. bad password is displayed to stdin or stderr)
+
 # to enable CHANGESET:
 
 # Take in the server name, port number, and new set name. Send it via the secret mechanism.
