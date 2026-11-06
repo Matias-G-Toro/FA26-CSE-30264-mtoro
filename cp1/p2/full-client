@@ -2,18 +2,53 @@
 import socket
 import sys
 import signal # handle Ctrl + C
+import argparse
+import time
+import random
 
-# Take IP and port of dispatch server
-# TODO: error handling
-server_address_port = (sys.argv[1], int(sys.argv[2]))
+def parse_arguments():
+    # ./full-client 127.0.0.1 54057 RandomID AuthTestOnly39#
+    # ./full-client 127.0.0.1 54102 GoIrishBeatStanford AuthTest
+    parser = argparse.ArgumentParser(
+        prog="full-client",
+        description="collect auth and invoke TCP file downloading"
+    )
+    parser.add_argument("host", help="dispatch server IPv4 address or hostname (grab server called automatically, default localhost)")
+    parser.add_argument("port", type=int, help="dispatch server port (default 54000)")
+    parser.add_argument("id", help="TODO: Placeholder")
+    parser.add_argument("auth", nargs = "?", default = "AuthTestOnly39", help="TODO: Placeholder")
+    parser.add_argument('--nosleep', default=False, type=bool, help="Pause between 10-30 seconds between retrying the connection/authentication flow to the server (default True)")
+    args = parser.parse_args()
+    if args.port < 54000 or args.port > 54150:
+        print("port must be between 54000 and 541450!", file = sys.stderr)
+        sys.exit(1)
+    return args
 
+if __name__ == "__main__":
+    args = parse_arguments()
 
-# It should take in the IP and port of the dispatch server.
-# It should also take in an ID and authorization information.
+    # set address and port
+    server_address_port = (args.host, args.port) # IP and Port of Dispath server
+    authmode="SIMPLE"
+    message=f"HELLO2 OK {args.id} {authmode} {args.id}".encode("utf-8")
 
-# ./full-client 127.0.0.1 54057 RandomID AuthTestOnly39#
-# ./full-client 127.0.0.1 54102 GoIrishBeatStanford AuthTest
-# On startup, it should connect to the server using that information.
+    # create a UDP socket at client side
+    client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    # Send data to server
+    client_socket.sendto(message, server_address_port
+
+    # Receive Response from server
+    server_data = client_socket.recvfrom(1024)
+    msg_from_server = server_data[0].decode()
+
+    # TODO: redo sending; on startup, send RDYTOSCAN request to the server
+    # C->S RDYTOSCAN GoIrishBeatStanford OneSecondRemains
+    # C->S RDYTOSCAN GoIrishBeatStanford TheFoxJumps
+
+    print(f"Message from server: {msg_from_server}")
+
+    print(args)
 
 # If successfully authenticated, it should send a RDYTOSCAN request to the server.
 
@@ -25,7 +60,6 @@ server_address_port = (sys.argv[1], int(sys.argv[2]))
 # You should gracefully catch and handle Control-C.
 
 # It is up to you if this is a change to your C client or a new piece of wrapper code (Python, shell scripting, etc.).
-
 
 # 1 pt - Properly runs on the CSE student machine
 # 1 pt - Properly catches Control-C and exits gracefully

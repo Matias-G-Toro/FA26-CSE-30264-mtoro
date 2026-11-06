@@ -9,7 +9,6 @@ import json
 # 1 pt - New tokens are generated for each different client
 # 1 pt - Arguments can change port, auth file, set
 
-
 # TODO: Wait for UDP on the port. This must operate over UDP
 # add timeout
 
@@ -24,32 +23,24 @@ import json
 
 # Using the information specified when the server started up, provide a properly formatted list.
 
+# TODO: authlists/auth1.csv is #id, auth in authlists
 def init_auth(authlist):
     with open(autlist, "r") as authlist_file:
         authlist_reader = reader(authlist_file)
-        for row in authlist_reader
+        for row in authlist_reader:
+            pass
             # process(row)
             # TODO: Load this into some dict
 
 def init_scan(scansets):
-    for args in 
+    pass
 
 def parse_arguments():
     
-    desc= """dispatch-server [OPTIONS]
-    -p, --port PORT
-        override the default port 54000 (between 54000 and 54150)
-    -a, --auth FILE
-        override the default input csv file for authorization
-    -s, --scansets FILE
-        override the specified JSON file
-    """
     parser = argparse.ArgumentParser(
         prog='dispatch-server',
-        description='securely serve a json file up over UDP', 
-        epilog=desc
+        description='securely serve a json file up over UDP'
     )
-
     parser.add_argument("-p", "--port",
         default=54000,
         type=int,
@@ -67,11 +58,10 @@ def parse_arguments():
         choices=os.listdir("scansets"),
         help="select JSON file from ./scansets/ (default is 'scan.json')"
     ) 
-
     args = parser.parse_args()
     if args.port < 54000 or args.port > 54150:
         print("port must be between 54000 and 54150!", file=sys.stderr)
-        sys.exit(2)
+        sys.exit(1)
 
     return args
 
@@ -79,8 +69,8 @@ if __name__ == "__main__":
     args = parse_arguments()
     print(args.port, args.auth, args.scansets)
     # TODO: Initialize Auths and scansets
-    auths = init_auth(args.auth)
-    scanset = init_scan(args.scan)
+    # auths = init_auth(args.auth)
+    # scanset = init_scan(args.scan)
 
     # set address and port
     server_address_port = ("127.0.0.1", args.port)
@@ -88,9 +78,8 @@ if __name__ == "__main__":
     # create a UDP socket at server side
     server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    client = set() # TODO: give each client unique auth with hash() of unique ip, port pairs
-    # TODO: purely just call hash() function
-        # str(int(hash((1,2)))*-1)[:12]
+    # TODO: track client auth based on their ID string
+    # str(int(hash((1,2)))*-1)[:12]
     while True:
         # Receive request from client
         client_data = server_sock.recvfrom(1024)
