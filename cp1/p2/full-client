@@ -33,13 +33,16 @@ if __name__ == "__main__":
     message=f"HELLO2 OK {args.id} {authmode} {args.id}".encode("utf-8")
 
     # create a UDP socket at client side
-    client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     # Send data to server
-    client_socket.sendto(message, server_address_port
+    print(f"C->S: {message} to {server_address_port}")
+    client_socket.sendto(message, server_address_port)
 
     # Receive Response from server
+    print("starting to receive from server")
     server_data = client_socket.recvfrom(1024)
+    print("received")
     msg_from_server = server_data[0].decode()
 
     # TODO: redo sending; on startup, send RDYTOSCAN request to the server
@@ -48,7 +51,6 @@ if __name__ == "__main__":
 
     print(f"Message from server: {msg_from_server}")
 
-    print(args)
 
 # If successfully authenticated, it should send a RDYTOSCAN request to the server.
 

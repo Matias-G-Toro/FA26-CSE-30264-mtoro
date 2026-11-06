@@ -5,12 +5,7 @@ import sys
 import os
 import csv
 import json
-
-# 1 pt - New tokens are generated for each different client
-# 1 pt - Arguments can change port, auth file, set
-
-# TODO: Wait for UDP on the port. This must operate over UDP
-# add timeout
+from pathlib import Path
 
 # Process the HELLO2 (not HELLO) message.
 # Confirm that the ID provided by the client matches up correctly using one of the auth lists.
@@ -23,16 +18,27 @@ import json
 
 # Using the information specified when the server started up, provide a properly formatted list.
 
-# TODO: authlists/auth1.csv is #id, auth in authlists
+# TODO: append dictionary for authlists/auth1.csv
 def init_auth(authlist):
-    with open(autlist, "r") as authlist_file:
-        authlist_reader = reader(authlist_file)
+    authlist_path = Path("authlists")
+    authlist_path /= authlist
+
+    # use obj = pathlib.path("scansets")
+    """load id-auth pairs into "auths" dict from CSV file"""
+    auths = dict()
+    with open(authlist_path, "r") as authlist_file:
+        authlist_reader = csv.reader(authlist_file)
         for row in authlist_reader:
-            pass
-            # process(row)
-            # TODO: Load this into some dict
+            if row[0][0] != '#' and row[0] in auths: 
+                auths[row[0]] = row[1] 
+            if row[0] in auths:
+                print("ids must be unique",file=sys.stderr)
+                sys.exit(1)
+    print(auths)
+    return auths
 
 def init_scan(scansets):
+    """load ?scansets? into ... from JSON file?"""
     pass
 
 def parse_arguments():
@@ -67,23 +73,31 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
-    print(args.port, args.auth, args.scansets)
-    # TODO: Initialize Auths and scansets
-    # auths = init_auth(args.auth)
+    auths = init_auth(args.auth)
+
     # scanset = init_scan(args.scan)
+    # TODO: 1 pt - New tokens are generated for each different client
+    # NOTE: Info above in comments.
+    # use obj = pathlib.path("scansets")
+    # and then obj.exists()
 
     # set address and port
     server_address_port = ("127.0.0.1", args.port)
 
     # create a UDP socket at server side
-    server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    # TODO: track client auth based on their ID string
-    # str(int(hash((1,2)))*-1)[:12]
+    server_socket.bind(server_address_port)
+    print(f"binded to {server_address_port}, starting to listen")
+
+
+    # TODO: add timeout
     while True:
         # Receive request from client
-        client_data = server_sock.recvfrom(1024)
+        client_data = server_socket.recvfrom(1024)
+        print("recved, loading in client message")
         msg_from_client = client_data[0].decode()
+        print("decoding message")
         client_address, client_port = client_data[1]
         # TODO: Process data from client (no forking yet)
         print(msg_from_client)
