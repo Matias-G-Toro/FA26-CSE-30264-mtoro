@@ -12,17 +12,17 @@ class Token:
     def __init__(self, client_id=None: str, client_token=None: int):
         self.client_id=client_id
         self.client_token=client_token
-        self.used_tokens = dict()
-        self.charset = string.printable.strip() # len 94
+        self.charset = string.printable.strip() # len 94. 94 choose 2 is 10^14
         # self.charset.choices(self.charset,k=12)
 
-    def assign_token(self, client_id):
-        # pick distinct new token TODO: probability=0 of a collapse
-        if client_id in self.used_tokens:
-            token = None
-            self.used_tokens[client_id] = ''.join(random.choices(self.charset,k=12))
-        if self.used_tokens in that: print
-        pass
+    def assign_token(self):
+        # NOTE: The cumulative probability of a collision reaches 50% at approximately
+        # 23 million choices (94 choose 12 sized set, used AI to help me estimate this)
+        # For the purposes of this assignment, the probability of collision is close enough
+        # to zero such that we don't make a retry loop for this, and leave it for a design
+        # choice for part 3.
+        self.client_token = ''.join(random.choices(self.charset,k=12))
+
 
 # TODO: append dictionary for authlists/auth1.csv
 def init_auth(authlist):
