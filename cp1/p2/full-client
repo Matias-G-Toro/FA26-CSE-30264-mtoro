@@ -11,12 +11,12 @@ def parse_arguments():
     # ./full-client 127.0.0.1 54102 GoIrishBeatStanford AuthTest
     parser = argparse.ArgumentParser(
         prog="full-client",
-        description="collect auth and invoke TCP file downloading"
+        description="Authenticate yourself with the server to download all files using."
     )
     parser.add_argument("host", help="dispatch server IPv4 address or hostname (grab server called automatically, default localhost)")
     parser.add_argument("port", type=int, help="dispatch server port (default 54000)")
-    parser.add_argument("id", help="TODO: Placeholder")
-    parser.add_argument("auth", nargs = "?", default = "AuthTestOnly39", help="TODO: Placeholder")
+    parser.add_argument("id", help="Client ID. The \"username\" the server recognizes you as.")
+    parser.add_argument("authinfo", nargs = "?", default = "AuthTestOnly39", help="Client Password. By default, bypass password security! If not, you'll be checkd against the server's ID-AUTHINFO \"database\" (JSON file)")
     parser.add_argument('--nosleep', default=False, type=bool, help="Pause between 10-30 seconds between retrying the connection/authentication flow to the server (default True)")
     args = parser.parse_args()
     if args.port < 54000 or args.port > 54150:
@@ -29,21 +29,24 @@ if __name__ == "__main__":
 
     # set address and port
     server_address_port = (args.host, args.port) # IP and Port of Dispath server
-    authmode="SIMPLE"
-    message=f"HELLO2 OK {args.id} {authmode} {args.id}".encode("utf-8")
 
     # create a UDP socket at client side
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    # Send data to server
-    print(f"C->S: {message} to {server_address_port}")
+    invalid_client_response = True
+    # TODO: while invalid_client_response:
+    # Send HELLO2 to server
+    authmode="SIMPLE"
+    message=f"HELLO2 OK {args.id} {authmode} {args.authinfo}".encode("utf-8")
     client_socket.sendto(message, server_address_port)
 
     # Receive Response from server
-    print("starting to receive from server")
     server_data = client_socket.recvfrom(1024)
     print("received")
     msg_from_server = server_data[0].decode()
+    msg_from_server = msg_from_server.split()
+    # TODO: S->C CLRTOSCAN BADPWD BadPassword
+
 
     # TODO: redo sending; on startup, send RDYTOSCAN request to the server
     # C->S RDYTOSCAN GoIrishBeatStanford OneSecondRemains

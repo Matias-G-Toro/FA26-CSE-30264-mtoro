@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import random
 import socket
 import sys
 import os
@@ -7,34 +8,36 @@ import csv
 import json
 from pathlib import Path
 
-# Process the HELLO2 (not HELLO) message.
-# Confirm that the ID provided by the client matches up correctly using one of the auth lists.
-# Generate a random string (nonce) of 8-12 characters for the AUTHTOKEN using the same AUTHSIMPLE auth mode.
+class Token:
+    def __init__(self, client_id=None: str, client_token=None: int):
+        self.client_id=client_id
+        self.client_token=client_token
+        self.used_tokens = dict()
+        self.charset = string.printable.strip() # len 94
+        # self.charset.choices(self.charset,k=12)
 
-# Each client should get a different AUTHTOKEN. If the same ID is used, only the new AUTHTOKEN should work.
-# Only accept RDYTOSCAN messages from clients that provide the correct AUTHTOKEN information.
-
-# The AuthTestOnly39# should not work on RDYTOSCAN, only HELLO.
-
-# Using the information specified when the server started up, provide a properly formatted list.
+    def assign_token(self, client_id):
+        # pick distinct new token TODO: probability=0 of a collapse
+        if client_id in self.used_tokens:
+            token = None
+            self.used_tokens[client_id] = ''.join(random.choices(self.charset,k=12))
+        if self.used_tokens in that: print
+        pass
 
 # TODO: append dictionary for authlists/auth1.csv
 def init_auth(authlist):
+    """load id-auth pairs into "auths" dict from CSV file"""
     authlist_path = Path("authlists")
     authlist_path /= authlist
-
-    # use obj = pathlib.path("scansets")
-    """load id-auth pairs into "auths" dict from CSV file"""
     auths = dict()
-    with open(authlist_path, "r") as authlist_file:
+    with open(str(authlist_path), "r") as authlist_file:
         authlist_reader = csv.reader(authlist_file)
         for row in authlist_reader:
-            if row[0][0] != '#' and row[0] in auths: 
+            if row[0][0] != '#' and (row[0] not in auths): 
                 auths[row[0]] = row[1] 
-            if row[0] in auths:
+            elif row[0] in auths:
                 print("ids must be unique",file=sys.stderr)
                 sys.exit(1)
-    print(auths)
     return auths
 
 def init_scan(scansets):
@@ -42,7 +45,6 @@ def init_scan(scansets):
     pass
 
 def parse_arguments():
-    
     parser = argparse.ArgumentParser(
         prog='dispatch-server',
         description='securely serve a json file up over UDP'
@@ -73,37 +75,63 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
-    auths = init_auth(args.auth)
-
+    id_authinfo = init_auth(args.auth)
+    id_tokens = dict()
     # scanset = init_scan(args.scan)
-    # TODO: 1 pt - New tokens are generated for each different client
-    # NOTE: Info above in comments.
-    # use obj = pathlib.path("scansets")
-    # and then obj.exists()
+    print(f"id_authinfo (user-passwd list) made:\n\t{id_authinfo}")
 
     # set address and port
     server_address_port = ("127.0.0.1", args.port)
-
     # create a UDP socket at server side
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     server_socket.bind(server_address_port)
-    print(f"binded to {server_address_port}, starting to listen")
+    print(f"server process binded to {server_address_port}, starting to listen")
 
-
+    
     # TODO: add timeout
-    while True:
-        # Receive request from client
-        client_data = server_socket.recvfrom(1024)
-        print("recved, loading in client message")
-        msg_from_client = client_data[0].decode()
-        print("decoding message")
-        client_address, client_port = client_data[1]
-        # TODO: Process data from client (no forking yet)
-        print(msg_from_client)
+    # TODO: wrap everything below in loop
+    # Get HELLO2
+    client_data = server_socket.recvfrom(1024)
+    print("client received data")
+    msg_from_client = client_data[0].decode()
 
+    msg_args = msg_from_client.split()
+    client_address, client_port = client_data[1]
+    print(msg_args, client_address, client_port)
 
+    # Process HELLO2 message
+    if (msg_args[0] == "HELLO2" and len(msg_args) == 5):
+        msg_id = msg_args[2]
+        msg_auth_type = msg_args[3]
+        msg_auth = msg_args[4]
+
+        # Confirm that the ID provided by the client matches up correctly using one of the auth lists.
+        # Generate a random string (nonce) of 8-12 characters for the AUTHTOKEN using the same AUTHSIMPLE auth mode.
+        print(msg_id, msg_auth_type, msg_auth)
+        if msg_auth == "AuthTestOnly39#":
+            print("you can just do whatever")
+            # TODO: build hello_response
+            hello_response = "RHELLO2 OK GoIrishBeatStanford 127.0.0.1 32829 SIMPLE TheFoxJumps".encode("utf-8")
+            server_socket.sendto(hello_response, client_data[1])
+
+        elif msg_id in id_authinfo and id_authinfo[msg_id] == msg_auth:
+            print("security bypassed!")
+            pass
+            
+            # TODO: you can speak
+        else:
+            pass
+            # TODO: you can't speak
+        
+        # server_socket.sendto(rdy_msg, client)
+        # TODO: Confirm that the ID provided by the client matches up correctly using one of the auth lists. 
+        # TODO: Generate a random string (nonce) of 8-12 characters for the AUTHTOKEN using the same AUTHSIMPLE auth mode.
+        # Each client should get a different AUTHTOKEN. If the same ID is used, only the new AUTHTOKEN should work.
+
+# 1 pt - New tokens are generated for each different client
 # 1 pt - HELLO2 is parsed properly
 # 1 pt - RHELLO2 is responded properly
 # 1 pt - CLRTOSCAN is parsed properly
 # 1 pt - RDYTOSCAN is responded properly
+# 1 pt - Ctrl + C has a signal handler function to close the current connection
